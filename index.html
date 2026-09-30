@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SECLAB // laboratório de segurança web</title>
+<style>
+:root{--bg:#050805;--fg:#33ff66;--dim:#1a9940;--warn:#ffd23f;--err:#ff4d4d;--info:#5ad1ff;--panel:#0a120a}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.45 "Courier New",ui-monospace,monospace;text-shadow:0 0 3px rgba(51,255,102,.35)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(transparent 0 2px,rgba(0,0,0,.25) 2px 3px)}
+
+/* ===== LOGIN ===== */
+#login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:10}
+#login-box{border:1px solid var(--dim);background:var(--panel);padding:24px 30px;width:300px;text-align:center;box-shadow:0 0 24px rgba(51,255,102,.15)}
+#login-box h2{margin:0 0 4px;font-size:15px;letter-spacing:2px}
+#login-box p{color:var(--dim);font-size:11px;margin:0 0 14px}
+#login-box input{width:100%;background:#000;color:var(--fg);border:1px solid var(--dim);padding:7px;font:14px monospace;margin-bottom:8px;outline:0}
+#login-box button{width:100%;background:transparent;color:var(--fg);border:1px solid var(--fg);padding:7px;font:13px monospace;cursor:pointer;margin-top:4px}
+#login-box button:hover{background:var(--fg);color:#000}
+#login-msg{min-height:16px;font-size:12px;color:var(--err)}
+#toggle-register{color:var(--info);cursor:pointer;font-size:11px;text-decoration:underline;margin-top:10px;display:inline-block}
+.hide{display:none !important}
+
+/* ===== DESKTOP ===== */
+#desktop{display:none;height:100%;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:10px}
+#taskbar{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:6px 14px;
+  border-bottom:1px solid var(--dim);font-size:12px;color:var(--dim);background:var(--panel);z-index:5}
+#monitor{width:min(920px,96vw);height:min(600px,82vh);border:2px solid var(--dim);border-radius:6px;
+  background:var(--panel);display:flex;flex-direction:column;box-shadow:0 0 30px rgba(51,255,102,.12)}
+#winbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:12px}
+#winbar span.dot{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+#tabs{display:flex;gap:4px;margin-left:10px}
+#tabs button{background:transparent;border:1px solid var(--dim);color:var(--dim);font:11px monospace;padding:3px 9px;cursor:pointer}
+#tabs button.active{color:var(--fg);border-color:var(--fg)}
+#screenbody{flex:1;display:grid;grid-template-columns:1fr 220px;min-height:0}
+#term{display:flex;flex-direction:column;min-height:0;padding:8px}
+#out{flex:1;overflow-y:auto;white-space:pre-wrap;word-break:break-word;font-size:13px}
+#row{display:flex;gap:6px;padding-top:6px;border-top:1px solid var(--dim)}
+#in{flex:1;background:transparent;border:0;outline:0;color:var(--fg);font:inherit;text-shadow:inherit;caret-color:var(--fg)}
+aside{border-left:1px solid var(--dim);padding:8px;overflow-y:auto;font-size:11px}
+aside h3{margin:6px 0 4px;font-size:11px;color:var(--info)}
+#menu div{padding:2px 0}#menu .lk{cursor:pointer}#menu .lk:hover{background:var(--dim);color:#000}
+#log{color:var(--dim);white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto}
+.err{color:var(--err)}.warn{color:var(--warn)}.info{color:var(--info)}.dim{color:var(--dim)}.raw{color:#c8ffd6}.ok{color:#000;background:var(--fg);padding:0 4px}
+#panel-arquivos,#panel-navegador{padding:6px;overflow-y:auto;font-size:12px;display:none}
+.folder{color:var(--info)}.file{cursor:pointer}.file:hover{background:var(--dim);color:#000}
+@media(max-width:760px){#screenbody{grid-template-columns:1fr}aside{border-left:0;border-top:1px solid var(--dim)}}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div id="login-box">
+    <h2>SECLAB // ACESSO</h2>
+    <p>Laboratório educacional de segurança web — tudo simulado.</p>
+    <input id="l-user" placeholder="usuário" autocomplete="off">
+    <input id="l-pass" type="password" placeholder="senha" autocomplete="off">
+    <button id="btn-entrar">Entrar</button>
+    <button id="btn-registrar" class="hide">Criar conta</button>
+    <div id="login-msg"></div>
+    <span id="toggle-register">criar uma conta nova (usuário comum)</span>
+  </div>
+</div>
+
+<div id="desktop">
+  <div id="taskbar"><span>APOSTACORP // SECLAB-OS</span><span id="tb-user"></span></div>
+  <div id="monitor">
+    <div id="winbar">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <div id="tabs">
+        <button data-p="terminal" class="active">Terminal</button>
+        <button data-p="arquivos">Arquivos</button>
+        <button data-p="navegador">Navegador</button>
+      </div>
+    </div>
+    <div id="screenbody">
+      <div id="term"><div id="out"></div>
+        <div id="row"><span>op@apostacorp:~$</span><input id="in" autocomplete="off" spellcheck="false" autofocus></div>
+      </div>
+      <div id="panel-arquivos"></div>
+      <div id="panel-navegador"></div>
+      <aside>
+        <h3>[ FASES ]</h3><div id="menu"></div>
+        <h3>[ PROGRESSO ]</h3><div id="prog"></div>
+        <h3>[ LOGS ]</h3><div id="log"></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   SECLAB v2 — laboratório educacional de segurança web
+   AVISO: tudo simulado nesta página. Nenhuma requisição de rede real
+   é feita e nenhum alvo real pode ser atacado. Ferramentas (nmap,
+   sqlmap etc.) são SIMULADAS em JavaScript, não são os programas reais.
+   ===================================================================== */
+
+/* ---------- ARQUIVOS/LORE por fase (para o app "Arquivos") ---------- */
+const FILES = {
+  1: [['notas.txt', 'A busca de documentos da intranet parece devolver tudo que a gente digita. Vale investigar.'],
+      ['servidor.log', '[GET] /  [GET] /robots.txt  [GET] /search?q=...']],
+  2: [['schema.txt', 'tabela funcionarios(id, nome, cargo). A consulta usa o nome digitado direto.'],
+      ['acesso.txt', 'nenhuma validação de tipo é feita sobre o texto de busca.']],
+  3: [['contratos.txt', 'cada funcionário só deveria ver o próprio recibo de pagamento.'],
+      ['ids.txt', 'os recibos são numerados sequencialmente a partir do 1.']],
+  4: [['sessao.txt', 'a sessão do usuário é um objeto guardado no próprio navegador (sem assinatura).'],
+      ['painel.txt', '/admin-panel só deveria abrir para quem tem role administrativo de verdade.']]
+};
+
+/* ---------- FASES ---------- */
+const LEVELS = [
+{
+  id:1, title:'Eco perigoso', topic:'XSS refletido',
+  story:['Você foi contratado(a) para revisar a intranet da ApostaCorp (empresa fictícia de apostas).',
+         'O time de dev diz que o site é seguro porque "ninguém acha o painel admin".',
+         'Host do laboratório: apostacorp.lab (existe só aqui dentro).'],
+  objective:'Faça o site devolver HTML/JS controlado por você em uma resposta (prove um XSS refletido).',
+  tools:[['escanear','simula um scan tipo nmap e lista rotas conhecidas'],
+         ['curl <caminho>','faz uma requisição GET simulada. Ex: curl /']],
+  hints:[
+    "Todo aplicativo web tem 'superfícies de entrada' — lugares onde você manda dados pro servidor. Comece descobrindo o que existe: escanear",
+    "O scan mostrou uma rota de busca. Visite ela sem nenhum parâmetro primeiro: curl /search",
+    "Agora mande um parâmetro q com um texto qualquer e repare se ele volta na resposta: curl /search?q=teste",
+    "Se o texto volta exatamente como você digitou, teste se o servidor filtra tags HTML: curl /search?q=<b>oi</b>",
+    "Se a tag <b> aparecer funcionando (negrito) em vez de aparecer como texto puro, o site não escapa a entrada. Tente algo que rode código: curl /search?q=<script>alert(1)<\/script>",
+    "Se a tag de script for bloqueada, tente um atributo de evento em outra tag: curl /search?q=<img src=x onerror=alert(1)>"
+  ],
+  handle(cmd, rest, api) {
+    if (cmd === 'escanear') { api.print('Portas/rotas encontradas em apostacorp.lab:', 'info'); ['/','/robots.txt','/search?q=','/admin'].forEach(r=>api.print('  '+r)); return true; }
+    if (cmd !== 'curl') return false;
+    const arg = rest.trim();
+    let u; try { u = new URL(arg || '/', 'http://apostacorp.lab'); } catch { api.print('curl: URL inválida','err'); return true; }
+    api.log('GET ' + u.pathname + u.search);
+    const http = (s,b) => { api.print('HTTP/1.1 '+s,'dim'); api.print(b,'raw'); };
+    switch (u.pathname) {
+      case '/': http('200 OK','<html><body>\n<h1>Intranet ApostaCorp</h1>\n<a href="/search">Buscar documentos</a>\n<!-- TODO: remover /admin antes de produção -->\n</body></html>'); break;
+      case '/robots.txt': http('200 OK','User-agent: *\nDisallow: /admin'); break;
+      case '/admin': http('403 Forbidden','<h1>Acesso negado</h1>'); api.print('O painel está protegido. O problema desta fase está em outro lugar.','warn'); break;
+      case '/search': {
+        const q = u.searchParams.get('q') ?? '';
+        http('200 OK', `<html><body>\n<h1>Resultados para: ${q}</h1>\n<p>Nenhum documento encontrado.</p>\n</body></html>`);
+        const perigoso = /<\s*script|<\s*(img|svg|iframe|body|details)[^>]*\son\w+\s*=|\bon(error|load|focus|click)\s*=|javascript:/i;
+        if (perigoso.test(q)) api.win();
+        else if (/<\s*\w+/.test(q)) api.print('[analisador] tag refletida sem escape... mas ainda não executa código.','warn');
+        break;
+      }
+      default: http('404 Not Found','<h1>Não encontrado</h1>');
+    }
+    return true;
+  },
+  solucao:'curl /search?q=<script>alert(1)<\/script>  (ou: curl /search?q=<img src=x onerror=alert(1)>)',
+  debrief:{
+    happened:'Seu texto foi inserido na página exatamente como digitado. Um navegador real trataria a tag de script ou o atributo onerror como código executável.',
+    why:'O servidor concatenou a entrada do usuário direto no HTML, sem codificação. Dados viraram código.',
+    fix:['1. Escapar a saída conforme o contexto (< vira &lt;, > vira &gt;).','2. Usar templates com auto-escape (React, Jinja2...) e evitar innerHTML.','3. Definir uma Content-Security-Policy.','4. Validar entrada como camada extra (nunca substitui o escape de saída).','5. Cookies de sessão com HttpOnly e SameSite.'],
+    code:'// ERRADO\nres.send(`<h1>Resultados para: ${q}</h1>`);\n// CERTO\nres.send(`<h1>Resultados para: ${escapeHtml(q)}</h1>`);'
+  }
+},
+{
+  id:2, title:'A consulta traiçoeira', topic:'SQL Injection',
+  story:['A ApostaCorp tem um sistema interno de consulta de funcionários.','O sistema recebe um nome e procura esse funcionário no banco.','O dev acha que está protegido. Não está.'],
+  objective:'Manipule a consulta para que ela retorne dados que não deveriam ser acessíveis por uma busca normal.',
+  tools:[['escanear','lista endpoints internos conhecidos'],['buscar <nome>','consulta um funcionário pelo nome. Ex: buscar joao']],
+  hints:[
+    "Comece com uma consulta normal para ver como o sistema responde: buscar joao",
+    "Repare que o comando imprime a consulta SQL exata que seria executada — isso é uma pista enorme. Leia com atenção.",
+    "A consulta usa aspas simples para abrir/fechar seu texto. O que acontece se seu próprio texto já tiver uma aspa dentro? Teste: buscar o'",
+    "Se a consulta impressa ficou com aspas sobrando ou desbalanceadas, isso confirma que seu texto é colado direto na query, sem nenhuma proteção (nada de parâmetros preparados).",
+    "Agora, em vez de só quebrar a sintaxe, tente fazer a condição do WHERE ficar sempre verdadeira, fechando a aspa e completando a lógica você mesmo.",
+    "Um padrão clássico é encerrar seu valor e adicionar uma condição que é sempre verdadeira, tipo: ' OR '1'='1"
+  ],
+  handle(cmd, rest, api) {
+    if (cmd === 'escanear') { api.print('Endpoints internos: buscar <nome>  (tabela: funcionarios)', 'info'); return true; }
+    if (cmd !== 'buscar') return false;
+    const q = rest.trim();
+    if (!q) { api.print('Uso: buscar <nome>', 'err'); return true; }
+    api.print("SELECT id, nome, cargo FROM funcionarios WHERE nome = '" + q + "';", 'dim');
+    if (q.includes("' OR '1'='1") || q.includes("' OR 1=1") || q.includes('" OR "1"="1')) {
+      api.print('AVISO: a entrada alterou a lógica da consulta.', 'warn');
+      api.print('id: 42 | nome: Joao | cargo: Funcionário', 'ok');
+      api.print('id: 17 | nome: Maria | cargo: Financeiro', 'ok');
+      api.print('id: 1  | nome: Diretoria | cargo: Root', 'ok');
+      api.win(); return true;
+    }
+    if (q.toLowerCase() === 'joao') { api.print('id: 42 | nome: Joao | cargo: Funcionário', 'ok'); return true; }
+    if (q.toLowerCase() === 'maria') { api.print('id: 17 | nome: Maria | cargo: Financeiro', 'ok'); return true; }
+    if (q.includes("'")) api.print("[analisador] consulta com aspas desbalanceadas — a query provavelmente falharia ou se comportaria de forma inesperada num banco real.", 'warn');
+    else api.print('Nenhum funcionário encontrado.', 'dim');
+    return true;
+  },
+  solucao:"buscar x' OR '1'='1",
+  debrief:{
+    happened:"Sua entrada com \"' OR '1'='1\" fez a cláusula WHERE ficar sempre verdadeira, retornando todos os registros da tabela.",
+    why:'O servidor concatenou seu texto direto na string SQL, sem parâmetros preparados (prepared statements).',
+    fix:['1. Sempre usar prepared statements / queries parametrizadas.','2. Nunca concatenar entrada de usuário em SQL.','3. Aplicar princípio do menor privilégio na conta do banco.','4. Validar e limitar o formato esperado da entrada.'],
+    code:"// ERRADO\ndb.query(\"SELECT * FROM funcionarios WHERE nome = '\" + q + \"'\");\n// CERTO\ndb.query('SELECT * FROM funcionarios WHERE nome = ?', [q]);"
+  }
+},
+{
+  id:3, title:'Número da sorte', topic:'Controle de acesso (IDOR)',
+  story:['A ApostaCorp tem um portal onde cada funcionário vê seu próprio recibo de pagamento.','Você está logado como o funcionário de id 42.','O time de dev jura que "cada um só vê o próprio recibo".'],
+  objective:'Visualize o recibo de outro funcionário sem ter permissão para isso.',
+  tools:[['curl /recibo/<id>','busca o recibo pelo id. Ex: curl /recibo/42']],
+  hints:[
+    "Comece vendo o seu próprio recibo: curl /recibo/42",
+    "Repare que o número 42 está exposto na própria URL que você digitou — um forte sinal de que o servidor confia no que o cliente manda.",
+    "Se o número identifica o recurso, o que acontece se você trocar só ele, sem mudar mais nada? Teste um vizinho: curl /recibo/41",
+    "Se o recibo de outra pessoa apareceu, pergunte-se: o servidor confirmou que aquele recibo pertencia a você, ou só confirmou que você estava logado?",
+    "Tente também um número bem baixo — IDs pequenos costumam pertencer a contas antigas ou administrativas: curl /recibo/1"
+  ],
+  handle(cmd, rest, api) {
+    if (cmd !== 'curl') return false;
+    const m = rest.trim().match(/^\/recibo\/(\d+)$/);
+    if (!m) { api.print('curl: recurso não encontrado.', 'err'); return true; }
+    const idPedido = parseInt(m[1]), meuId = 42;
+    api.log('GET /recibo/' + idPedido + ' (sessão: usuário ' + meuId + ')');
+    const recibos = {42:{nome:'Você',salario:'R$ 3.200,00'}, 41:{nome:'Marcos Andrade',salario:'R$ 7.800,00'}, 1:{nome:'Diretoria (root)',salario:'R$ 42.000,00'}};
+    const r = recibos[idPedido] || {nome:'Funcionário '+idPedido, salario:'R$ 2.500,00'};
+    api.print('HTTP/1.1 200 OK', 'dim');
+    api.print(`<html><body>\n<h1>Recibo #${idPedido}</h1>\n<p>Nome: ${r.nome}</p>\n<p>Salário: ${r.salario}</p>\n</body></html>`, 'raw');
+    if (idPedido !== meuId) api.win();
+    return true;
+  },
+  solucao:'curl /recibo/1',
+  debrief:{
+    happened:'Você trocou o número na requisição e o servidor entregou o recibo de outra pessoa, mesmo você estando logado como o usuário 42.',
+    why:'O servidor verificou que você estava LOGADO, mas não verificou se o recibo pedido pertencia a VOCÊ. Essa falha é IDOR (Insecure Direct Object Reference).',
+    fix:['1. Sempre checar no servidor se o recurso pedido pertence ao usuário autenticado.','2. Preferir identificadores difíceis de adivinhar (UUID) como camada extra.','3. Centralizar a checagem de permissão.','4. Registrar tentativas de acesso a recursos de outros usuários.'],
+    code:"// ERRADO\napp.get('/recibo/:id', (req,res)=> db.getRecibo(req.params.id));\n// CERTO\napp.get('/recibo/:id', (req,res)=>{\n  const r = db.getRecibo(req.params.id);\n  if (r.usuarioId !== req.sessao.usuarioId) return res.status(403).end();\n  return r;\n});"
+  }
+},
+{
+  id:4, title:'A sessão que confia demais', topic:'Escalonamento de privilégio / sessão insegura',
+  story:['Desafio final. Você precisa acessar o painel administrativo do BetLab (produto da ApostaCorp).','Sua sessão diz que seu papel (role) é "usuario".','O sistema confia no que está guardado no lado do cliente.'],
+  objective:'Consiga acessar /admin-panel sem ter, de verdade, permissão administrativa.',
+  tools:[['sessao','mostra os dados da sua sessão atual'],['sessao definir <campo> <valor>','tenta alterar um campo da sua sessão'],['curl /admin-panel','tenta acessar o painel administrativo']],
+  hints:[
+    "Comece vendo como o sistema sabe quem você é: sessao",
+    "Repare que a sessão é só um objeto de dados guardado no seu navegador, sem nenhuma assinatura ou verificação criptográfica. Olhe o campo 'role' dentro dela.",
+    "Se o servidor confia cegamente no que está nessa sessão, o que acontece se você mesmo mudar esse campo? Teste: sessao definir role admin",
+    "Depois de alterar, tente acessar o painel: curl /admin-panel",
+    "Se funcionar, pense: por que isso é perigoso mesmo sem ninguém 'invadir' nada? O que deveria ter impedido essa mudança?"
+  ],
+  handle(cmd, rest, api) {
+    api.session = api.session || {usuario:'op', role:'usuario'};
+    if (cmd === 'sessao') {
+      const r = rest.trim().split(/\s+/);
+      if (r[0] === 'definir') {
+        const campo = r[1], valor = r.slice(2).join(' ');
+        if (!campo || !valor) { api.print('Uso: sessao definir <campo> <valor>', 'err'); return true; }
+        api.session[campo] = valor;
+        api.print('Sessão atualizada (client-side): ' + JSON.stringify(api.session), 'warn');
+        return true;
+      }
+      api.print(JSON.stringify(api.session, null, 2), 'raw');
+      return true;
+    }
+    if (cmd !== 'curl') return false;
+    if (rest.trim() === '/admin-panel') {
+      api.log('GET /admin-panel (role enviada: ' + api.session.role + ')');
+      if (api.session.role === 'admin') {
+        api.print('HTTP/1.1 200 OK', 'dim');
+        api.print('<html><body><h1>Painel Administrativo BetLab</h1><p>Acesso concedido.</p></body></html>', 'raw');
+        api.win();
+      } else {
+        api.print('HTTP/1.1 403 Forbidden', 'dim');
+        api.print('<h1>Acesso negado — role atual: ' + api.session.role + '</h1>', 'raw');
+      }
+      return true;
+    }
+    api.print('curl: recurso não encontrado.', 'err');
+    return true;
+  },
+  solucao:'sessao definir role admin  (depois)  curl /admin-panel',
+  debrief:{
+    happened:'Você editou o campo "role" da sua própria sessão, guardada no lado do cliente, e o servidor aceitou essa mudança sem checar nada.',
+    why:'A aplicação confiou em dados que o próprio usuário controla, em vez de validar a permissão no servidor com um mecanismo assinado (ex: JWT assinado, sessão validada no backend).',
+    fix:['1. Nunca confiar em dados de permissão vindos do cliente.','2. Usar sessões armazenadas e validadas no servidor, ou tokens assinados (JWT com verificação de assinatura).','3. Verificar a permissão em CADA requisição sensível, no backend.','4. Aplicar o princípio do menor privilégio por padrão.'],
+    code:"// ERRADO\nif (req.body.session.role === 'admin') { ... }\n// CERTO\nconst sessao = validarSessaoAssinada(req.cookies.token);\nif (sessao.role === 'admin') { ... }"
+  }
+}
+];
+
+/* ---------- ENGINE ---------- */
+const $ = id => document.getElementById(id);
+const KEY = 'apostacorp.progresso';
+const USERS_KEY = 'apostacorp.usuarios';
+let state = {done:[], current:null, hintsUsed:0};
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.done)) state.done = s.done; } catch {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({done:state.done})); } catch {} };
+const getUsers = () => { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; } };
+const saveUsers = u => { try { localStorage.setItem(USERS_KEY, JSON.stringify(u)); } catch {} };
+
+let queue = Promise.resolve();
+function print(text, cls='') {
+  queue = queue.then(() => new Promise(r => {
+    const d = document.createElement('div'); d.className = cls; d.textContent = text; $('out').appendChild(d);
+    $('out').scrollTop = $('out').scrollHeight; setTimeout(r, 12);
+  }));
+}
+function log(msg) {
+  const t = new Date().toLocaleTimeString('pt-BR');
+  const d = document.createElement('div'); d.textContent = `[${t}] ${msg}`;
+  $('log').appendChild(d);
+  while ($('log').children.length > 60) $('log').firstChild.remove();
+  $('log').scrollTop = $('log').scrollHeight;
+}
+const unlocked = l => l.id === 1 || state.done.includes(l.id - 1);
+const cur = () => LEVELS.find(l => l.id === state.current);
+
+function renderSide() {
+  $('menu').innerHTML = '';
+  LEVELS.forEach(l => {
+    const d = document.createElement('div');
+    const mark = state.done.includes(l.id) ? '[X]' : unlocked(l) ? '[ ]' : '[#]';
+    d.textContent = `${mark} ${l.id}. ${l.title}`;
+    if (unlocked(l)) { d.className = 'lk'; d.onclick = () => run('iniciar ' + l.id); } else d.className = 'dim';
+    $('menu').appendChild(d);
+  });
+  $('prog').textContent = `${'█'.repeat(state.done.length)}${'░'.repeat(Math.max(LEVELS.length-state.done.length,0))} ${state.done.length}/${LEVELS.length}`;
+}
+function renderArquivos() {
+  const l = cur(); const p = $('panel-arquivos'); p.innerHTML = '';
+  const files = (l && FILES[l.id]) || [];
+  const h = document.createElement('div'); h.className='folder'; h.textContent='/home/op/fase'+(l?l.id:'')+'/'; p.appendChild(h);
+  files.forEach(([name,content]) => {
+    const f = document.createElement('div'); f.className='file'; f.textContent='  '+name;
+    f.onclick = () => run('ler ' + name);
+    p.appendChild(f);
+  });
+  if (!files.length) p.appendChild(Object.assign(document.createElement('div'), {className:'dim', textContent:'Nenhuma fase ativa.'}));
+}
+function renderNavegador() {
+  const p = $('panel-navegador'); p.innerHTML='';
+  const rotas = {1:['/','/robots.txt','/search?q='],2:['/painel-rh (interno)'],3:['/recibo/<id>'],4:['/admin-panel']};
+  const l = cur(); const list = (l && rotas[l.id]) || [];
+  p.appendChild(Object.assign(document.createElement('div'),{className:'info',textContent:'Páginas conhecidas de apostacorp.lab / betlab.lab:'}));
+  list.forEach(r => p.appendChild(Object.assign(document.createElement('div'),{textContent:'  '+r})));
+  if(!list.length) p.appendChild(Object.assign(document.createElement('div'),{className:'dim',textContent:'Rode "escanear" no terminal pra descobrir rotas.'}));
+}
+
+function banner() {
+  print('=== SECLAB — ApostaCorp OS ===', 'info');
+  print('Laboratório educacional de segurança web — tudo simulado, nenhum alvo real.', 'dim');
+  print("Digite 'ajuda' para comandos ou 'iniciar 1' para começar.", 'info');
+}
+
+function startLevel(id) {
+  const l = LEVELS.find(x => x.id === id);
+  if (!l) return print('Fase inexistente.', 'err');
+  if (!unlocked(l)) return print('Fase bloqueada. Conclua a anterior primeiro.', 'err');
+  state.current = id; state.hintsUsed = 0;
+  print(''); print(`=== FASE ${l.id}: ${l.title.toUpperCase()} ===`, 'info');
+  print(`Tema: ${l.topic}`, 'dim');
+  l.story.forEach(s => print(s));
+  print(''); print('OBJETIVO: ' + l.objective, 'warn');
+  print("Comandos: " + l.tools.map(t=>t[0]).join(' | '), 'dim');
+  print("Digite 'dica' se travar, 'ferramentas' para detalhes.", 'dim');
+  log('Fase ' + id + ' iniciada'); renderArquivos(); renderNavegador();
+}
+
+function win() {
+  const l = cur(); if (!l || state.done.includes(l.id)) return;
+  const d = l.debrief;
+  print(''); print(' >>> DESAFIO CONCLUÍDO <<< ', 'ok');
+  print('O QUE ACONTECEU:', 'info'); print(d.happened);
+  print('POR QUE ACONTECEU:', 'info'); print(d.why);
+  print('COMO CORRIGIR:', 'info'); d.fix.forEach(f => print(f));
+  print(d.code, 'raw');
+  print(`Dicas usadas: ${state.hintsUsed}/${l.hints.length}`, 'dim');
+  state.done.push(l.id); save(); renderSide();
+  log('Fase ' + l.id + ' concluída');
+  const next = LEVELS.find(x => x.id === l.id+1);
+  print(next ? `Fase ${next.id} liberada! Digite 'iniciar ${next.id}'.` : 'Parabéns — laboratório concluído!', 'warn');
+}
+
+const COMMANDS = {
+  ajuda(){['ajuda        lista comandos','fases        menu de fases','iniciar <n>  começa a fase n','objetivo     repete o objetivo','dica         revela a próxima pista','ferramentas  lista ferramentas da fase','status       progresso','limpar       limpa terminal','resetar      apaga progresso'].forEach(t=>print(t));
+    if (window.__role==='admin') print('pular / solucao   (comandos de administrador)','warn');},
+  fases(){LEVELS.forEach(l=>print(`${state.done.includes(l.id)?'[X]':unlocked(l)?'[ ]':'[#]'} ${l.id}. ${l.title}`));},
+  iniciar(a){startLevel(parseInt(a));},
+  objetivo(){const l=cur();print(l?l.objective:'Nenhuma fase ativa.', l?'warn':'err');},
+  dica(){const l=cur(); if(!l) return print('Nenhuma fase ativa.','err');
+    if(state.hintsUsed>=l.hints.length) return print('Sem mais dicas. Releia as respostas do servidor.','warn');
+    print(`DICA ${state.hintsUsed+1}/${l.hints.length}: `+l.hints[state.hintsUsed++],'warn'); log('Dica usada');},
+  ferramentas(){const l=cur(); if(!l) return print('Nenhuma fase ativa.','err'); l.tools.forEach(t=>print(t[0].padEnd(28)+t[1]));},
+  status(){print(`Concluídas: ${state.done.length}/${LEVELS.length}. Fase atual: ${state.current??'nenhuma'}.`);},
+  limpar(){$('out').innerHTML='';},
+  resetar(){state.done=[];state.current=null;save();renderSide();print('Progresso apagado.','warn');},
+  ler(a){const l=cur(); if(!l) return print('Nenhuma fase ativa.','err');
+    const files=FILES[l.id]||[]; const f=files.find(x=>x[0]===a);
+    if(!f) return print('Arquivo não encontrado.','err');
+    print(f[1]);},
+  pular(){ if (window.__role!=='admin') return print('Comando restrito: apenas administrador.','err');
+    const l=cur(); if(!l) return print('Nenhuma fase ativa.','err');
+    print('[ADMIN] Fase pulada.','warn'); win();},
+  solucao(){ if (window.__role!=='admin') return print('Comando restrito: apenas administrador.','err');
+    const l=cur(); if(!l) return print('Nenhuma fase ativa.','err');
+    print('[ADMIN] Solução: '+l.solucao,'warn');}
+};
+
+const apiShared = {print, log, win, session:{usuario:'op', role:'usuario'}};
+
+function run(line) {
+  line = line.trim(); if (!line) return;
+  print('$ ' + line, 'dim');
+  const [cmd, ...r] = line.split(/\s+/), rest = line.slice(cmd.length).trim(), c = cmd.toLowerCase();
+  if (COMMANDS[c]) return COMMANDS[c](r.join(' '));
+  const l = cur();
+  if (l && l.handle && l.handle(c, rest, apiShared)) return;
+  print(`comando não encontrado: ${cmd}. Digite 'ajuda'.`, 'err');
+}
+
+const hist=[]; let hi=0;
+$('in').addEventListener('keydown', e => {
+  if (e.key==='Enter') { hist.push($('in').value); hi=hist.length; run($('in').value); $('in').value=''; }
+  else if (e.key==='ArrowUp' && hi>0) $('in').value = hist[--hi];
+  else if (e.key==='ArrowDown') $('in').value = hist[++hi] ?? '';
+});
+
+/* ---------- ABAS (Terminal / Arquivos / Navegador) ---------- */
+document.querySelectorAll('#tabs button').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const p = btn.dataset.p;
+    $('term').style.display = p==='terminal' ? 'flex' : 'none';
+    $('panel-arquivos').style.display = p==='arquivos' ? 'block' : 'none';
+    $('panel-navegador').style.display = p==='navegador' ? 'block' : 'none';
+    if (p==='arquivos') renderArquivos();
+    if (p==='navegador') renderNavegador();
+    if (p==='terminal') $('in').focus();
+  };
+});
+
+/* ---------- LOGIN / REGISTRO ---------- */
+const ADMIN_USER='admin', ADMIN_SENHA='160703';
+$('toggle-register').onclick = () => {
+  const reg = $('btn-registrar').classList.toggle('hide') === false;
+  $('btn-entrar').classList.toggle('hide', reg);
+  $('toggle-register').textContent = reg ? 'já tenho conta, entrar' : 'criar uma conta nova (usuário comum)';
+  $('login-msg').textContent='';
+};
+$('btn-registrar').onclick = () => {
+  const u = $('l-user').value.trim(), p = $('l-pass').value;
+  if (!u || !p) return $('login-msg').textContent='Preencha usuário e senha.';
+  if (u.toLowerCase() === ADMIN_USER) return $('login-msg').textContent='Esse nome é reservado.';
+  const users = getUsers();
+  if (users[u]) return $('login-msg').textContent='Usuário já existe.';
+  users[u] = p; saveUsers(users);
+  $('login-msg').style.color = 'var(--fg)'; $('login-msg').textContent='Conta criada! Faça login.';
+};
+$('btn-entrar').onclick = () => {
+  const u = $('l-user').value.trim(), p = $('l-pass').value;
+  let role = null;
+  if (u === ADMIN_USER && p === ADMIN_SENHA) role='admin';
+  else { const users = getUsers(); if (users[u] && users[u] === p) role='usuario'; }
+  if (!role) { $('login-msg').textContent='Usuário ou senha incorretos.'; return; }
+  window.__role = role;
+  $('login-screen').style.display='none';
+  $('desktop').style.display='flex';
+  $('tb-user').textContent = u + ' [' + role + ']';
+  renderSide(); banner();
+  if (role==='admin') print('Modo administrador ativo. Comandos extras: pular, solucao.', 'warn');
+  $('in').focus();
+};
+document.addEventListener('click', e => {
+  if (['l-user','l-pass','in'].includes(e.target.id)) return;
+  if ($('term').style.display !== 'none' && !getSelection().toString()) $('in').focus();
+});
+</script>
+</body>
+</html>
